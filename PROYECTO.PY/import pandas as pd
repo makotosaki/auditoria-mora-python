@@ -1,0 +1,60 @@
+import pandas as pd
+from datetime import datetime
+import os
+
+def ejecutar_auditoria():
+    try:
+        # 1. Configuración de archivos
+        archivo_entrada = 'facturas.xlsx'
+        hoy = datetime.now()
+        nombre_informe = f"Informe_Mora_{hoy.strftime('%Y-%m-%d')}.xlsx"
+
+        # 2. Carga y limpieza de datos
+        # Leemos el Excel que creaste manualmente
+        df = pd.read_excel(archivo_entrada)
+        
+        # Normalizamos los nombres de las columnas (quita espacios y errores)
+        df.columns = df.columns.str.strip()
+
+        # 3. Lógica de Auditoría
+        # Convertimos la columna de vencimiento a formato fecha real
+        df['Vencimiento'] = pd.to_datetime(df['Vencimiento'])
+        
+        # Filtramos: Estado debe ser 'Pendiente' y la fecha debe ser menor a hoy
+        morosos = df[(df['Estado'] == 'Pendiente') & (df['Vencimiento'] < hoy)]
+
+        # 4. Generación del Informe con formato profesional
+        if not morosos.empty:
+            # Usamos XlsxWriter como motor para poder ajustar las columnas
+            writer = pd.ExcelWriter(nombre_informe, engine='xlsxwriter')
+            morosos.to_excel(writer, index=False, sheet_name='Detalle_Mora')
+
+            # Accedemos a la hoja para ajustar el ancho de las columnas automáticamente
+            workbook  = writer.book
+            worksheet = writer.sheets['Detalle_Mora']
+
+            for i, col in enumerate(morosos.columns):
+                # Calculamos el ancho basándonos en el texto más largo de cada columna
+                column_len = max(morosos[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, column_len)
+
+            writer.close()
+
+            print("--------------------------------------------------")
+            print(f"✅ ÉXITO: Se ha generado el archivo '{nombre_informe}'")
+            print(f"📊 Se encontraron {len(morosos)} facturas vencidas.")
+            print(f"💰 TOTAL EN RIESGO: ${morosos['Monto'].sum()}")
+            print("--------------------------------------------------")
+        else:
+            print("--------------------------------------------------")
+            print("✅ PROCESO COMPLETADO: No se detectaron deudas vencidas.")
+            print("--------------------------------------------------")
+
+    except FileNotFoundError:
+        print("❌ ERROR: No se encontró 'facturas.xlsx'. Asegurate de que el nombre sea exacto.")
+    except Exception as e:
+        print(f"❌ OCURRIÓ UN ERROR INESPERADO: {e}")
+
+# Ejecución del sistema
+if __name__ == "__main__":
+    ejecutar_auditoria()
